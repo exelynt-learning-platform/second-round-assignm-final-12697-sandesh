@@ -19,6 +19,8 @@ public class OrderService {
     private final CartRepository cartRepository;
     private final UserRepository userRepository;
 
+    private final ProductRepository productRepository;
+
     @Transactional
     public Order createOrderFromCart(String username, String shippingAddress) {
         User user = userRepository.findByUsername(username)
@@ -52,6 +54,24 @@ public class OrderService {
                 .map(item -> item.getPrice().multiply(new BigDecimal(item.getQuantity())))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         order.setTotalAmount(total);
+
+        //  STOCK VALIDATION + REDUCTION
+        for (CartItem cartItem : cart.getItems()) {
+
+    Product product = cartItem.getProduct();
+
+    // Check stock
+    if (product.getStockQuantity() < cartItem.getQuantity()) {
+        throw new RuntimeException("Insufficient stock for product: " + product.getName());
+    }
+
+    // Reduce stock
+    product.setStockQuantity(
+        product.getStockQuantity() - cartItem.getQuantity()
+    );
+
+    productRepository.save(product);
+}
 
         Order savedOrder = orderRepository.save(order);
 
